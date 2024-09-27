@@ -28,6 +28,7 @@ def time_attributes(df):
     df['hour'] = df['local_time'].dt.hour
 
 def tci_by_period_geography(ddf, period, geography, agg_column):
+    '''Returns Traffic Congestion Index'''
     tci = ddf.groupby([period, geography])[[agg_column]].sum().compute()
     tci.rename(columns = {'length': 'tci'}, inplace = True)
     return tci
@@ -85,6 +86,7 @@ def get_summary_statistics_city(ddf, year, working_days):
     table['tci'] = mean_tci_geog(ddf, 'date', 'city', 'length', working_days)
 
     return table.add_suffix(year)
+
 
 def line_to_segments(x):
     '''Break linestrings into individual segments'''
