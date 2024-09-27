@@ -8,6 +8,7 @@ from shapely import wkt
 
 
 def tci_by_period_geography(ddf, period, geography, agg_column):
+    '''Returns Traffic Congestion Index'''
     tci = ddf.groupby([period, geography])[[agg_column]].sum().compute()
     tci.rename(columns = {'length': 'tci'}, inplace = True)
     return tci
@@ -24,6 +25,10 @@ def mean_tci_geog(ddf, date, geog, agg_column, working_days):
     return daily_tci.groupby(geog)['tci'].mean()
 
 def time_attributes(data, utc_loc):
+    '''Converts time to datetime
+
+        Args:
+            utc_loc (pytz.BaseTzInfo): The local timezone region'''
     data['date_utc'] = data.ts.dt.tz_localize('UTC')
     data['date_utc'] = data.date_utc.dt.tz_convert(utc_loc)
     data['year'] = data['date_utc'].dt.year
@@ -73,8 +78,10 @@ def get_summary_statistics_city(ddf, year, working_days):
 
     return table.add_suffix(year)
 
-def convert_to_time(df, utc_region):
-    '''Convert date stored in string to datetime type'''
+def convert_to_local_time(df, utc_region):
+    '''Convert date stored in string to datetime type
+        Args:
+            utc_loc (pytz.BaseTzInfo): The local timezone region'''
     df['ts'] = pd.to_datetime(df['ts'], utc = True)
     df['local_time'] = df['ts'].dt.tz_convert(utc_region)
     df['hour'] = df['local_time'].dt.hour
