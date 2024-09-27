@@ -3,12 +3,12 @@ requires = ["hatchling>=1.21.0", "hatch-vcs>=0.3.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "template"
+name = "wazeasy"
 description = "A template Python package from the World Bank Data Lab"
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { file = "LICENSE" }
 keywords = ["template", "reproducibility"]
-authors = [{ name = "Development Data Group", email = "datalab@worldbank.org" }]
+authors = [{ name = "Maria Sol Tadeo", email = "mtadeo@worldbank.org" }]
 classifiers = [
 	"Programming Language :: Python :: 3",
 	"Programming Language :: Python :: 3.7",
@@ -24,12 +24,8 @@ classifiers = [
 ]
 dynamic = ["version"]
 
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 dependencies = [
-	"bokeh>=3,<4",
-	"requests>=2.28.1",
-	"pandas>=2",
-	"pycountry>=22.3.5",
 ]
 [project.optional-dependencies]
 docs = [
@@ -49,7 +45,7 @@ ignore-words-list = "gost,Nd"
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "src/**/*"
+    "src/wazeasy"
 ]
 
 [tool.hatch.version]
