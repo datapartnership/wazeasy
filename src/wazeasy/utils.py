@@ -97,7 +97,9 @@ def line_to_segments(x):
     return ['LineString('+', '.join(elem)+')' for elem in points]
 
 def get_jam_count_per_segment(df):
-    '''Count how many jams occured in one segment'''
+    '''This function counts a jam every time it appears in the DB.
+    The hypothesis is that longer jams will appear more times than shorter ones.
+     '''
     df['segments'] = df['geoWKT'].apply(lambda x: line_to_segments(x))
     df_exp = df.explode('segments')
     segment_count = df_exp.groupby('segments').size().reset_index()
