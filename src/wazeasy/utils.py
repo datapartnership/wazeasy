@@ -29,7 +29,7 @@ def time_attributes(df):
 
 def tci_by_period_geography(ddf, period, geography, agg_column):
     '''Returns Traffic Congestion Index'''
-    tci = ddf.groupby([period, geography])[[agg_column]].sum().compute()
+    tci = ddf.groupby(period + geography)[[agg_column]].sum().compute()
     tci.rename(columns = {'length': 'tci'}, inplace = True)
     return tci
 
@@ -115,3 +115,4 @@ def harmonize_data(table):
     table.reset_index(inplace=True)
     table['city'] = table['city'].apply(lambda x: remove_last_comma(x))
     table.set_index('city', inplace=True)
+
