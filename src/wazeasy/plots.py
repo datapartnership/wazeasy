@@ -70,7 +70,8 @@ def regional_tci_per_day(data, save_fig = False):
         plt.savefig('./images/daily_tci.png', bbox_inches='tight')
     plt.close()
 
-def hourly_tci_by_month (data, date_start, date_end, combination_year_month, save_fig = False):
+#TODO: generalize the groups. Introduce them in the arguments
+def hourly_tci_by_month (data, date_start, date_end, combination_year_month, group, save_fig = False):
     hourly_tci = utils.tci_by_period_geography(data, ['date', 'hour'], ['region'], 'length')
     hourly_tci.reset_index(inplace=True)
     dates = (pd.date_range(start=date_start, end=date_end, freq='D')).date
@@ -99,7 +100,7 @@ def hourly_tci_by_month (data, date_start, date_end, combination_year_month, sav
     for y, m in combination_year_month:
         month = hourly_tci_by_group_month[(hourly_tci_by_group_month['year'] == y) &
                                           (hourly_tci_by_group_month['month'] == m) &
-                                          (hourly_tci_by_group_month['group'] == 'Mon-Tues-Wed')]
+                                          (hourly_tci_by_group_month['group'] == group)]
         ax = axes[row, col]  # Access each subplot
         ax.plot(month.hour, month.tci)
         ax.set_title('{} - {}'.format(y, m))
