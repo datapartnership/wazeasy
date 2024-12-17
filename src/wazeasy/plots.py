@@ -7,9 +7,10 @@ import matplotlib.pyplot as plt
 sns.set()
 
 def jams_per_day(data, save_fig = False):
-    jams_per_day = data.groupby('date')['uuid'].nunique().compute()
+    jams_per_day = data.groupby('date')['uuid'].nunique().compute().reset_index()
+    jams_per_day.sort_values('date', inplace = True)
     plt.figure(figsize=(15, 7))
-    plt.plot(jams_per_day.index, jams_per_day)
+    plt.plot(jams_per_day['date'], jams_per_day['uuid'])
     plt.xticks(rotation=45)
     plt.xlabel('Date')
     plt.ylabel('Number of Jams')
@@ -21,8 +22,9 @@ def jams_per_day(data, save_fig = False):
 
 def jams_per_day_per_level(data, save_fig = False):
     jams_per_day_per_level = (data.groupby(['date', 'level'])['uuid'].nunique().compute()).reset_index()
+    jams_per_day_per_level.sort_values('date', inplace = True)
     plt.figure(figsize=(15, 7))
-    colors_by_level = {1: '#FFD700', 2: '#FFA500', 3: '#FF4500', 4: '#FF0000'}
+    colors_by_level = {1: '#FFD700', 2: '#FFA500', 3: '#FF4500', 4: '#FF0000', 5: '#4DFF00'}
     # colors_by_level = {1: '#0000FF', 2: '#8A2BE2', 3: '#FF00FF', 4: '#FF0000'}
     for level, color in colors_by_level.items():
         data = jams_per_day_per_level[jams_per_day_per_level['level']==level].copy()
@@ -59,6 +61,7 @@ def regional_tci_per_day(data, save_fig = False):
     data['region'] = 'Baghdad'
     tci = utils.tci_by_period_geography(data, ['date'], ['region'], 'length')
     tci.reset_index(inplace = True)
+    tci.sort_values('date', inplace = True)
     plt.figure(figsize=(15, 7))
     plt.plot(tci['date'], tci['tci'])
     plt.xticks(rotation=45)
