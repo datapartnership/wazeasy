@@ -10,7 +10,21 @@ import shapely
 import h3
 from dask import delayed, compute
 
+
+def load_data(main_path, year, month, sotrage_options = None, file_type = 'csv'):
+    # TODO: add documentation to the function
+    if file_type == 'csv':
+        load_data_csv(main_path, year, month)
+    elif file_type == 'parquet':
+        load_data_parquet(main_path, year, month, sotrage_options)
+
+#TODO write function for reading cvs files into dask data frame
+# def load_data_csv(main_path, year, month):
+#     # TBD
+#     return 
+
 def load_data_parquet(main_path, year, month, storage_options):
+    # TODO: add documentation to the function
     path = main_path + 'year={}/month={}/*.parquet'.format(year, month)
     df = dd.read_parquet(path, storage_options=storage_options, engine = 'pyarrow')
     return df
@@ -24,11 +38,16 @@ def handle_time(df, utc_region, parquet = False):
     df['local_time'] = df['ts'].dt.tz_convert(utc_region)
     time_attributes(df)
 
+def assign_geography_to_jams(ddf):
+    '''Assign a geography to each jam'''
+    ddf['region'] = 'region'
+    # TODO: Assign different geographies to each jam. Geographies will come from a config file. 
+
 def remove_level5(ddf):
     return ddf[ddf['level']!=5]
 
 def time_attributes(df):
-    '''Calculate year, month, date and hour for each jam'''
+    '''Calculate year, month, date and hour for each jam record'''
     df['year'] = df['local_time'].dt.year
     df['month'] = df['local_time'].dt.month
     df['date'] = df['local_time'].dt.date
@@ -36,25 +55,42 @@ def time_attributes(df):
 
 def tci_by_period_geography(ddf, period, geography, agg_column):
     '''Returns Traffic Congestion Index'''
-    if isinstance(ddf, pd.DataFrame):
-        tci = ddf.groupby(period + geography)[[agg_column]].sum()
-    else:
-        tci = ddf.groupby(period + geography)[[agg_column]].sum().compute()  
+    tci = ddf.groupby(period + geography)[[agg_column]].sum().compute()  
     tci.rename(columns = {agg_column: 'tci'}, inplace = True)    
     return tci
 
-# def get_h3
-
-def mean_tci_geog(ddf, date, geog, agg_column, working_days):
-    daily_tci = tci_by_period_geography(ddf, date, geog, agg_column)
-    geogs = list(daily_tci.reset_index(level = 0).index)
-    idxs = pd.MultiIndex.from_tuples(list(itertools.product(working_days, geogs)))
+def mean_hourly_tci(ddf, period, geog, agg_column, dates_of_interest):
+    '''Returns the mean TCI across the dates of interest'''
+    daily_tci = tci_by_period_geography(ddf, period, geog, agg_column)
+    geogs = list(set(daily_tci.reset_index()[geog])) 
+    idxs = pd.MultiIndex.from_tuples(list(itertools.product(dates_of_interest, list(range(24)), geogs)),
+                                     names = period + geog)
     daily_tci = daily_tci.reindex(idxs, fill_value = 0)
-    nlevels = daily_tci.index.nlevels
     daily_tci.reset_index(inplace = True)
-    daily_tci.rename(columns = dict(zip([f'level_{i}' for i in range(nlevels)], date+geog)), inplace = True)
-    return daily_tci.groupby(geog)['tci'].mean()
-    
+    return daily_tci.groupby(geog + ['hour'])['tci'].mean()
+
+def filter_date_range_by_dow(date_range, dow):
+    '''Filter a date range by days of the wee
+        dow: list of integers representing the days of the week to consider (0 = Monday, 6 = Sunday)'''
+    filtered_dates = []
+    for date in date_range:
+        if date.weekday() in dow:
+            filtered_dates.append(date)
+    return filtered_dates
+
+def monthly_hourly_tci(ddf, geog, period, year, month, agg_column, dow = None):
+    '''Returns the monthly TCI    
+        dow: list of integers representing the days of the week to consider (0 = Monday, 6 = Sunday)'''
+    start_date = dt(year, month, 1)
+    if month == 12:
+        end_date = dt(year + 1, 1, 1) - timedelta(days=1)
+    else:
+        end_date = dt(year, month + 1, 1) - timedelta(days=1)
+    date_range = pd.date_range(start_date, end_date)
+    dates_of_interest = filter_date_range_by_dow(date_range, dow)    
+    return mean_hourly_tci(ddf, period, geog, agg_column, dates_of_interest)
+
+   
 def create_gdf(data, epsg, col):
     geometry = data[col].apply(wkt.loads)
     data_geo = gpd.GeoDataFrame(data, crs="EPSG:{}".format(epsg), geometry=geometry)
