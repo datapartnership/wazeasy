@@ -5,6 +5,7 @@ from wazeasy import utils
 import seaborn as sns
 import matplotlib.pyplot as plt
 sns.set()
+import plotly.graph_objects as go
 
 def jams_per_day(data, save_fig = False):
     jams_per_day = data.groupby('date')['uuid'].nunique().compute().reset_index()
@@ -58,7 +59,7 @@ def jams_monthly_aggregated(data, save_fig = False):
     plt.close()
 
 def regional_tci_per_day(data, save_fig = False):
-    data['region'] = 'Baghdad'
+    #TODO: Add documentation to the function
     tci = utils.tci_by_period_geography(data, ['date'], ['region'], 'length')
     tci.reset_index(inplace = True)
     tci.sort_values('date', inplace = True)
@@ -67,54 +68,24 @@ def regional_tci_per_day(data, save_fig = False):
     plt.xticks(rotation=45)
     plt.xlabel('Date')
     plt.ylabel('TCI')
-    plt.title('Daily TCI')
+    plt.title('Regional Daily TCI')
     plt.show()
     if save_fig:
         plt.savefig('./images/daily_tci.png', bbox_inches='tight')
     plt.close()
 
-#TODO: generalize the groups. Introduce them in the arguments
-def hourly_tci_by_month (data, date_start, date_end, combination_year_month, group, save_fig = False):
-    hourly_tci = utils.tci_by_period_geography(data, ['date', 'hour'], ['region'], 'length')
-    hourly_tci.reset_index(inplace=True)
-    dates = (pd.date_range(start=date_start, end=date_end, freq='D')).date
-    all_idx = list(itertools.product(dates, list(range(0, 24))))
-    hourly_tci.set_index(['date', 'hour'], inplace=True)
-    hourly_tci = hourly_tci.reindex(all_idx).copy()
-    hourly_tci.reset_index(inplace=True)
-    hourly_tci['year'] = hourly_tci['date'].apply(lambda x: x.year)
-    hourly_tci['month'] = hourly_tci['date'].apply(lambda x: x.month)
-    hourly_tci['region'] = 'Baghdad'
-    hourly_tci.fillna(0, inplace=True)
-    groups = {0: 'Mon-Tues-Wed',
-              1: 'Mon-Tues-Wed',
-              2: 'Mon-Tues-Wed',
-              3: 'Sun-Thu',
-              4: 'Fri-Sat',
-              5: 'Fri-Sat',
-              6: 'Sun-Thu'}
-    hourly_tci['dow'] = hourly_tci['date'].apply(lambda x: x.weekday())
-    hourly_tci['group'] = hourly_tci['dow'].map(groups)
-    hourly_tci_by_group_month = hourly_tci.groupby(['year', 'month', 'hour', 'group'])['tci'].mean().reset_index()
-    fig, axes = plt.subplots(nrows=6, ncols=2, figsize=(10, 25))
-
-    col = 0
-    row = 0
-    for y, m in combination_year_month:
-        month = hourly_tci_by_group_month[(hourly_tci_by_group_month['year'] == y) &
-                                          (hourly_tci_by_group_month['month'] == m) &
-                                          (hourly_tci_by_group_month['group'] == group)]
-        ax = axes[row, col]  # Access each subplot
-        ax.plot(month.hour, month.tci)
-        ax.set_title('{} - {}'.format(y, m))
-        col += 1
-        if col > 1:
-            col = 0
-            row += 1
-    plt.show()
-    if save_fig:
-        plt.savefig('./images/hourly_tci.png', bbox_inches='tight')
-    plt.close()
+def hourly_tci_by_month (ddf, geog, combination_year_month, dow, group_name, save_fig = False):
+    fig = go.Figure()
+    for year, month in combination_year_month:
+        data = utils.monthly_hourly_tci(ddf, geog, ['date', 'hour'], year, month, 'length', dow = dow).reset_index()
+        fig.add_trace(go.Scatter(x=data.hour, y=data.tci, mode='lines', name=f'{year}{month}', visible=True))
+    fig.update_layout(title=f'Monthly Hourly TCI - {group_name}', 
+                      xaxis_title='Hour', 
+                      yaxis_title='TCI', 
+                      legend_title='Dates', 
+                      hovermode='x unified') 
+    fig.show()
+    # TODO: implement the save_fig option. Plotly has options for saving static and interactive figures. 
 
 
 
