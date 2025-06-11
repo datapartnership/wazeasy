@@ -13,7 +13,19 @@ from dask import delayed, compute
 
 
 def load_data(main_path, year, month, sotrage_options = None, file_type = 'csv'):
-    # TODO: add documentation to the function
+    '''
+    Load data from a specified path for a given year and month.
+
+    Parameters:
+    - main_path (str): The main directory path where data files are stored.
+    - year (int): The year of the data to load.
+    - month (int): The month of the data to load.
+    - storage_options (dict, optional): Options for storage backends, e.g., for cloud storage.
+    - file_type (str, optional): The type of file to load ('csv' or 'parquet'). Defaults to 'csv'.
+
+    Returns:
+    - DataFrame: A Dask DataFrame containing the loaded data.
+    '''
     if file_type == 'csv':
         load_data_csv(main_path, year, month)
     elif file_type == 'parquet':
@@ -25,13 +37,34 @@ def load_data(main_path, year, month, sotrage_options = None, file_type = 'csv')
 #     return 
 
 def load_data_parquet(main_path, year, month, storage_options):
-    # TODO: add documentation to the function
+    '''
+    Load parquet data from a specified path for a given year and month.
+
+    Parameters:
+    - main_path (str): The main directory path where parquet files are stored.
+    - year (int): The year of the data to load.
+    - month (int): The month of the data to load.
+    - storage_options (dict): Options for storage backends, e.g., for cloud storage.
+
+    Returns:
+    - DataFrame: A Dask DataFrame containing the loaded parquet data.
+    '''
     path = main_path + 'year={}/month={}/*.parquet'.format(year, month)
     df = dd.read_parquet(path, storage_options=storage_options, engine = 'pyarrow')
     return df
 
 def handle_time(df, utc_region, parquet = False):
-    '''Handle time column so that it is in the correct utc and calculate useful time attributes'''
+    '''
+    Handle time column to ensure it is in the correct UTC and calculate useful time attributes.
+
+    Parameters:
+    - df (DataFrame): The DataFrame containing the data.
+    - utc_region (str): The UTC region to convert the time to.
+    - parquet (bool, optional): Indicates if the data is in parquet format. Defaults to False.
+
+    Returns:
+    - None: Modifies the DataFrame in place.
+    '''
     if parquet:
         df['ts'] = df.ts.dt.tz_localize('UTC')
     else:
@@ -40,35 +73,85 @@ def handle_time(df, utc_region, parquet = False):
     time_attributes(df)
 
 def assign_geography_to_jams(ddf):
-    '''Assign a geography to each jam'''
+    '''
+    Assign a geography to each traffic jam.
+
+    Parameters:
+    - ddf (DataFrame): The Dask DataFrame containing traffic jam data.
+
+    Returns:
+    - None: Modifies the DataFrame in place.
+    '''
     ddf['region'] = 'region'
     # TODO: Assign different geographies to each jam. Geographies will come from a config file. 
 
 def remove_level5(ddf):
+    '''
+    Remove traffic jams with level 5 from the DataFrame.
+
+    Parameters:
+    - ddf (DataFrame): The Dask DataFrame containing traffic jam data.
+
+    Returns:
+    - DataFrame: A DataFrame excluding level 5 jams.
+    '''
     return ddf[ddf['level']!=5]
 
 def time_attributes(df):
-    '''Calculate year, month, date and hour for each jam record'''
+    '''
+    Calculate year, month, date, and hour for each jam record.
+
+    Parameters:
+    - df (DataFrame): The DataFrame containing the data.
+
+    Returns:
+    - None: Modifies the DataFrame in place.
+    '''
     df['year'] = df['local_time'].dt.year
     df['month'] = df['local_time'].dt.month
     df['date'] = df['local_time'].dt.date
     df['hour'] = df['local_time'].dt.hour
 
 def tci_by_period_geography(ddf, period, geography, agg_column, dow = None, custom_dates = None):
-    '''Returns Traffic Congestion Index'''
+    '''
+    Calculate the Traffic Congestion Index (TCI) by period and geography.
+
+    Parameters:
+    - ddf (DataFrame): The Dask DataFrame containing traffic jam data.
+    - period (list): The period over which to aggregate data.
+    - geography (list): The geographical areas to consider.
+    - agg_column (str): The column to aggregate.
+    - dow (list, optional): Days of the week to consider (0 = Monday, 6 = Sunday).
+    - custom_dates (list, optional): Specific dates to consider.
+
+    Returns:
+    - DataFrame: A DataFrame with the TCI calculated.
+    '''
     if dow is not None:
         unique_dates = ddf[["date"]].drop_duplicates().compute()['date'].values
         filtered_dates = filter_date_range_by_dow(unique_dates, dow)        
         ddf = ddf[ddf['date'].isin(filtered_dates)]
     elif custom_dates is not None:
-        ddf = ddf[ddf['date'].isin(cutom_dates)]
+        ddf = ddf[ddf['date'].isin(custom_dates)]
 
     tci = ddf.groupby(period + geography)[[agg_column]].sum().compute()  
     tci.rename(columns = {agg_column: 'tci'}, inplace = True)    
     return tci
 
 def mean_hourly_tci(ddf, period, geog, agg_column, dates_of_interest):
-    '''Returns the mean TCI across the dates of interest'''
+    '''
+    Calculate the mean Traffic Congestion Index (TCI) across the dates of interest.
+
+    Parameters:
+    - ddf (DataFrame): The Dask DataFrame containing traffic jam data.
+    - period (list): The period over which to aggregate data.
+    - geog (list): The geographical areas to consider.
+    - agg_column (str): The column to aggregate.
+    - dates_of_interest (list): Dates to consider for the calculation.
+
+    Returns:
+    - Series: A Series with the mean TCI for each hour.
+    '''
     daily_tci = tci_by_period_geography(ddf, period, geog, agg_column)
     geogs = list(set(daily_tci.reset_index()[geog])) 
     idxs = pd.MultiIndex.from_tuples(list(itertools.product(dates_of_interest, list(range(24)), geogs)),
@@ -78,7 +161,21 @@ def mean_hourly_tci(ddf, period, geog, agg_column, dates_of_interest):
     return daily_tci.groupby(geog + ['hour'])['tci'].mean()
 
 def mean_tci_geog(ddf, period, geog_id, dates, geogs, agg_column, projected_crs):
-    '''Averages the TCI for each geography across a period of time '''
+    '''
+    Average the Traffic Congestion Index (TCI) for each geography across a period of time.
+
+    Parameters:
+    - ddf (DataFrame): The Dask DataFrame containing traffic jam data.
+    - period (list): The period over which to aggregate data.
+    - geog_id (str): The geographical identifier.
+    - dates (list): Dates to consider for the calculation.
+    - geogs (GeoDataFrame): Geographical areas to consider.
+    - agg_column (str): The column to aggregate.
+    - projected_crs (str): The coordinate reference system for projection.
+
+    Returns:
+    - DataFrame: A DataFrame with the mean TCI for each geography.
+    '''
     ddf_filtered = ddf[ddf['date'].isin(dates)].copy()
     unique_jams_over_agg_geom = parallelized_overlay(ddf_filtered, geogs)
     jams_over_agg_geom = distribute_jams_over_aggregation_geom(unique_jams_over_agg_geom, ddf_filtered, projected_crs)
@@ -91,8 +188,16 @@ def mean_tci_geog(ddf, period, geog_id, dates, geogs, agg_column, projected_crs)
     return tci.groupby(geog_id)['tci'].mean()
 
 def filter_date_range_by_dow(date_range, dow):
-    '''Filter a date range by days of the wee
-        dow: list of integers representing the days of the week to consider (0 = Monday, 6 = Sunday)'''
+    '''
+    Filter a date range by days of the week.
+
+    Parameters:
+    - date_range (DatetimeIndex): The range of dates to filter.
+    - dow (list): Days of the week to consider (0 = Monday, 6 = Sunday).
+
+    Returns:
+    - list: A list of dates that match the specified days of the week.
+    '''
     filtered_dates = []
     for date in date_range:
         if date.weekday() in dow:
@@ -100,8 +205,21 @@ def filter_date_range_by_dow(date_range, dow):
     return filtered_dates
 
 def monthly_hourly_tci(ddf, geog, period, year, month, agg_column, dow = None):
-    '''Returns the monthly TCI    
-        dow: list of integers representing the days of the week to consider (0 = Monday, 6 = Sunday)'''
+    '''
+    Calculate the monthly Traffic Congestion Index (TCI).
+
+    Parameters:
+    - ddf (DataFrame): The Dask DataFrame containing traffic jam data.
+    - geog (list): The geographical areas to consider.
+    - period (list): The period over which to aggregate data.
+    - year (int): The year of the data.
+    - month (int): The month of the data.
+    - agg_column (str): The column to aggregate.
+    - dow (list, optional): Days of the week to consider (0 = Monday, 6 = Sunday).
+
+    Returns:
+    - Series: A Series with the monthly TCI for each hour.
+    '''
     start_date = dt(year, month, 1)
     if month == 12:
         end_date = dt(year + 1, 1, 1) - timedelta(days=1)
@@ -113,13 +231,21 @@ def monthly_hourly_tci(ddf, geog, period, year, month, agg_column, dow = None):
 
    
 def create_gdf(ddf):
-    '''Create a dask-geopandas GeoDataFrame from a dask DataFrame'''
+    '''
+    Create a Dask-Geopandas GeoDataFrame from a Dask DataFrame.
+
+    Parameters:
+    - ddf (DataFrame): The Dask DataFrame containing geographical data.
+
+    Returns:
+    - GeoDataFrame: A GeoDataFrame with the geometry column set.
+    '''
     ddf['geometry'] = dask_geopandas.from_wkt(ddf['geoWKT'], crs='epsg:4326')
     gddf = dask_geopandas.from_dask_dataframe(ddf, geometry='geometry')
     gddf = gddf.set_crs("EPSG:4326")
     return gddf
 
-def get_summary_statistics_street(df, street_names, year, working_days):
+def get_summary_statistics_street(df, street_names, year, working_days):  
     streets = df[df['street'].isin(street_names)].copy()
     table = (streets.groupby('street')['uuid']
              .nunique()
@@ -180,13 +306,23 @@ def remove_last_comma(name):
         return name[:-2]
     else:
         return name
+    
 def harmonize_data(table):
     table.reset_index(inplace=True)
     table['city'] = table['city'].apply(lambda x: remove_last_comma(x))
     table.set_index('city', inplace=True)
 
 def obtain_hexagons_for_area(area, resolution):
-    '''Given an Area of Operation, create a georeferrenced layer of h3 hexagons'''
+    '''
+    Create a georeferenced layer of H3 hexagons for a given Area of Operation.
+
+    Parameters:
+    - area (Polygon): The area of operation as a Shapely Polygon.
+    - resolution (int): The resolution of the H3 hexagons.
+
+    Returns:
+    - GeoDataFrame: A GeoDataFrame with H3 hexagons.
+    '''
     geo_json = json.loads(shapely.to_geojson(area))
     hexagons = list(h3.polyfill(geo_json, resolution))
     hex_geometries = [Polygon(h3.h3_to_geo_boundary(h, geo_json=True)) for h in hexagons]
@@ -195,18 +331,44 @@ def obtain_hexagons_for_area(area, resolution):
     return hex_gdf
 
 def obtain_unique_jams_linestrings(ddf):
-    '''Get unique jams linestrings to avoid overlaying the same linestring several times'''
+    '''
+    Get unique jam linestrings to avoid overlaying the same linestring multiple times.
+
+    Parameters:
+    - ddf (DataFrame): The Dask DataFrame containing traffic jam data.
+
+    Returns:
+    - GeoDataFrame: A GeoDataFrame with unique jam linestrings.
+    '''
     unique_geo = ddf[["geoWKT"]].drop_duplicates().reset_index(drop=True).reset_index()
     unique_geo = create_gdf(unique_geo)
     return unique_geo
 
 def overlay_group(group, hexagons):
-    '''Overlay between layers to be used when delaying processes'''
+    '''
+    Perform an overlay between layers for delayed processes.
+
+    Parameters:
+    - group (GeoDataFrame): A GeoDataFrame group to overlay.
+    - hexagons (GeoDataFrame): A GeoDataFrame of hexagons to overlay with.
+
+    Returns:
+    - GeoDataFrame: The result of the overlay operation.
+    '''
     result = gpd.overlay(group, hexagons, how = 'intersection')
     return result
 
 def parallelized_overlay(ddf, aggregation_geog):
-    '''Prallelize overlay by groups over some geometry'''
+    '''
+    Parallelize overlay by groups over some geometry.
+
+    Parameters:
+    - ddf (DataFrame): The Dask DataFrame containing traffic jam data.
+    - aggregation_geog (GeoDataFrame): The geographical areas for aggregation.
+
+    Returns:
+    - GeoDataFrame: The result of the parallelized overlay operation.
+    '''
     unique_geo = obtain_unique_jams_linestrings(ddf).persist()
     delayed_process_group = delayed(overlay_group)
     groups = [unique_geo.get_partition(i) for i in range(unique_geo.npartitions)]
@@ -216,6 +378,17 @@ def parallelized_overlay(ddf, aggregation_geog):
     return final_result
 
 def distribute_jams_over_aggregation_geom(gddf, ddf, projected_crs):
+    '''
+    Distribute jams over aggregation geometry.
+
+    Parameters:
+    - gddf (GeoDataFrame): The GeoDataFrame with jams and geometry.
+    - ddf (DataFrame): The Dask DataFrame containing traffic jam data.
+    - projected_crs (str): The coordinate reference system for projection.
+
+    Returns:
+    - DataFrame: A DataFrame with jams distributed over the aggregation geometry.
+    '''
     gddf = gddf.to_crs(projected_crs)
     gddf['length_in_geom'] = gddf['geometry'].length
     df = dd.from_pandas(gddf)

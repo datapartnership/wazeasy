@@ -8,6 +8,16 @@ sns.set()
 import plotly.graph_objects as go
 
 def jams_per_day(data, save_fig = False):
+    '''
+    Plot the number of unique traffic jams per day.
+
+    Parameters:
+    - data (DataFrame): A Dask DataFrame containing 'date' and 'uuid' columns.
+    - save_fig (bool): If True, saves the plot as a PNG file. Default is False.
+
+    Returns:
+    - None: Displays the plot and optionally saves it to a file.
+    '''
     jams_per_day = data.groupby('date')['uuid'].nunique().compute().reset_index()
     jams_per_day.sort_values('date', inplace = True)
     plt.figure(figsize=(15, 7))
@@ -22,6 +32,16 @@ def jams_per_day(data, save_fig = False):
     plt.close()
 
 def jams_per_day_per_level(data, save_fig = False):
+    '''
+    Plot the number of unique traffic jams per day, grouped by congestion level.
+
+    Parameters:
+    - data (DataFrame): A Dask DataFrame containing 'date', 'level', and 'uuid' columns.
+    - save_fig (bool): If True, saves the plot as a PNG file. Default is False.
+
+    Returns:
+    - None: Displays the plot and optionally saves it to a file.
+    '''
     jams_per_day_per_level = (data.groupby(['date', 'level'])['uuid'].nunique().compute()).reset_index()
     jams_per_day_per_level.sort_values('date', inplace = True)
     plt.figure(figsize=(15, 7))
@@ -43,6 +63,16 @@ def jams_per_day_per_level(data, save_fig = False):
 
 
 def jams_monthly_aggregated(data, save_fig = False):
+    '''
+    Plot the number of unique traffic jams aggregated by month.
+
+    Parameters:
+    - data (DataFrame): A Dask DataFrame containing 'year', 'month', and 'uuid' columns.
+    - save_fig (bool): If True, saves the plot as a PNG file. Default is False.
+
+    Returns:
+    - None: Displays the plot and optionally saves it to a file.
+    '''
     jams_per_month = data.groupby(['year', 'month'])['uuid'].nunique().compute()
     jams_per_month = jams_per_month.reset_index()
     jams_per_month['month_with_year'] = jams_per_month.apply(lambda row: dt.strptime('{}-{}-{}'.format(row['year'], row['month'], '15'), '%Y-%m-%d'), axis = 1)
@@ -59,7 +89,16 @@ def jams_monthly_aggregated(data, save_fig = False):
     plt.close()
 
 def regional_tci_per_day(data, save_fig = False):
-    #TODO: Add documentation to the function
+    '''
+    Plot the daily Traffic Congestion Index (TCI) aggregated by region.
+
+    Parameters:
+    - data (DataFrame): A Dask or Pandas DataFrame containing 'date', 'region', and 'length' columns.
+    - save_fig (bool): If True, saves the plot as a PNG file. Default is False.
+
+    Returns:
+    - None: Displays the plot and optionally saves it to a file.
+    '''
     tci = utils.tci_by_period_geography(data, ['date'], ['region'], 'length')
     tci.reset_index(inplace = True)
     tci.sort_values('date', inplace = True)
@@ -75,6 +114,20 @@ def regional_tci_per_day(data, save_fig = False):
     plt.close()
 
 def hourly_tci_by_month (ddf, geog, combination_year_month, dow, group_name, save_fig = False):
+    '''
+    Plot the hourly Traffic Congestion Index (TCI) for selected months.
+
+    Parameters:
+    - ddf (DataFrame): A Dask DataFrame containing traffic data.
+    - geog (str): The geographic column to group by.
+    - combination_year_month (list of tuples): List of (year, month) pairs to plot.
+    - dow (list): Days of the week to include (e.g. [0, 1, 2, 3, 4] for weekdays).
+    - group_name (str): Label used in the plot title (e.g. region name).
+    - save_fig (bool): Unused currently. Reserved for future implementation.
+
+    Returns:
+    - None: Displays the interactive Plotly figure.
+    '''
     fig = go.Figure()
     for year, month in combination_year_month:
         data = utils.monthly_hourly_tci(ddf, geog, ['date', 'hour'], year, month, 'length', dow = dow).reset_index()
